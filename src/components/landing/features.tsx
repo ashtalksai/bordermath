@@ -89,6 +89,7 @@ export function Features() {
                       width={48}
                       height={48}
                       className="rounded-lg"
+                      unoptimized
                     />
                   </div>
                 ) : feature.icon ? (

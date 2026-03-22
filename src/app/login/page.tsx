@@ -10,6 +10,7 @@ function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const registered = searchParams.get("registered")
+  const authError = searchParams.get("error")
   const [form, setForm] = useState({ email: "", password: "" })
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -56,6 +57,24 @@ function LoginForm() {
             Sign up free
           </Link>
         </p>
+
+        {authError && (
+          <div
+            className="rounded-lg p-4 mb-6 text-sm"
+            style={{
+              backgroundColor: "rgba(239,68,68,0.1)",
+              border: "1px solid rgba(239,68,68,0.3)",
+              color: "#ef4444",
+              fontFamily: "Plus Jakarta Sans, sans-serif",
+            }}
+          >
+            {authError === "Configuration"
+              ? "Authentication service is temporarily unavailable. Please try again."
+              : authError === "CredentialsSignin"
+              ? "Invalid email or password."
+              : "An error occurred during sign in. Please try again."}
+          </div>
+        )}
 
         {registered && (
           <div
