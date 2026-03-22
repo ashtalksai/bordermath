@@ -1,0 +1,119 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  passportCountry String?  @default("US")
+  subscriptionTier String  @default("free")
+  stripeCustomerId String?
+  onboardingComplete Boolean @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  accounts      Account[]
+  sessions      Session[]
+  routes        Route[]
+  alerts        Alert[]
+}
+
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?  @db.Text
+  access_token       String?  @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?  @db.Text
+  session_state      String?
+  user               User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+  @@unique([identifier, token])
+}
+
+model Route {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String   @default("My Route")
+  status    String   @default("compliant") // compliant | conflict | violation
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stops     RouteStop[]
+  alerts    Alert[]
+}
+
+model RouteStop {
+  id          String   @id @default(cuid())
+  routeId     String
+  countryCode String
+  countryName String
+  flag        String
+  entryDate   DateTime
+  exitDate    DateTime
+  visaType    String   @default("visa-free")
+  maxStayDays Int      @default(90)
+  notes       String?
+  orderIndex  Int      @default(0)
+  bandType    String   @default("schengen") // schengen | sea | other
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  route       Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
+}
+
+model Alert {
+  id          String   @id @default(cuid())
+  userId      String
+  routeId     String
+  type        String   // schengen_limit | overstay_risk | policy_change
+  message     String
+  triggerDate DateTime
+  sentAt      DateTime?
+  dismissedAt DateTime?
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  route       Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
+}
+
+model VisaRule {
+  id              String   @id @default(cuid())
+  countryCode     String
+  countryName     String
+  passportCode    String
+  maxStayDays     Int
+  windowDays      Int      @default(180)
+  visaType        String   @default("visa-free")
+  requiresApplication Boolean @default(false)
+  feeUsd          Float?
+  schengenZone    Boolean  @default(false)
+  updatedAt       DateTime @updatedAt
+  sourceUrl       String?
+  @@unique([countryCode, passportCode])
+}
