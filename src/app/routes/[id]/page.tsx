@@ -1,30 +1,21 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useParams } from "next/navigation"
 import Link from "next/link"
 import { motion } from "framer-motion"
 import {
   ArrowLeft,
   Plus,
   RefreshCw,
-  Download,
   Share2,
   AlertTriangle,
   CheckCircle2,
   GripVertical,
   X,
   Zap,
-  ChevronDown,
-  ChevronUp,
 } from "lucide-react"
-import { ComplianceTimeline, TimelineStop, DEMO_STOPS } from "@/components/route/compliance-timeline"
-
-const ROUTE_DATA = {
-  id: "route-1",
-  name: "Europe + SEA 2026",
-  status: "compliant" as const,
-  stops: DEMO_STOPS,
-}
+import { ComplianceTimeline, TimelineStop } from "@/components/route/compliance-timeline"
 
 function daysBetween(a: Date, b: Date) {
   return Math.ceil((b.getTime() - a.getTime()) / (1000 * 60 * 60 * 24))
@@ -84,10 +75,57 @@ function StopRow({ stop, onRemove }: { stop: TimelineStop; onRemove: () => void 
   )
 }
 
+const COUNTRY_OPTIONS = [
+  { code: "ES", name: "Spain", flag: "🇪🇸", bandType: "schengen" as const },
+  { code: "DE", name: "Germany", flag: "🇩🇪", bandType: "schengen" as const },
+  { code: "NL", name: "Netherlands", flag: "🇳🇱", bandType: "schengen" as const },
+  { code: "JP", name: "Japan", flag: "🇯🇵", bandType: "other" as const },
+  { code: "MY", name: "Malaysia", flag: "🇲🇾", bandType: "sea" as const },
+  { code: "VN", name: "Vietnam", flag: "🇻🇳", bandType: "sea" as const },
+]
+
 export default function RoutePage() {
-  const [stops, setStops] = useState<TimelineStop[]>(ROUTE_DATA.stops)
-  const [routeName, setRouteName] = useState(ROUTE_DATA.name)
+  const params = useParams()
+  const id = params?.id as string
+
+  const [stops, setStops] = useState<TimelineStop[]>([])
+  const [routeName, setRouteName] = useState("Loading…")
+  const [loading, setLoading] = useState(true)
   const [showAddCountry, setShowAddCountry] = useState(false)
+
+  useEffect(() => {
+    if (!id) return
+    fetch(`/api/routes/${id}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.route) {
+          setRouteName(data.route.name)
+          // Map DB stops → TimelineStop shape
+          const mapped: TimelineStop[] = data.route.stops.map((s: {
+            id: string
+            countryCode: string
+            countryName: string
+            flag: string
+            bandType: string
+            entryDate: string
+            exitDate: string
+          }) => ({
+            id: s.id,
+            countryCode: s.countryCode,
+            countryName: s.countryName,
+            flag: s.flag,
+            entryDate: new Date(s.entryDate),
+            exitDate: new Date(s.exitDate),
+            visaType: s.bandType === "schengen" ? "Schengen Visa-Free" : "Visa-Free",
+            maxStayDays: s.bandType === "schengen" ? 90 : 30,
+            bandType: s.bandType as "schengen" | "sea" | "other",
+          }))
+          setStops(mapped)
+        }
+        setLoading(false)
+      })
+      .catch(() => setLoading(false))
+  }, [id])
 
   const schengenDays = stops.reduce((acc, s) => {
     if (s.bandType === "schengen") return acc + daysBetween(s.entryDate, s.exitDate)
@@ -96,16 +134,17 @@ export default function RoutePage() {
   const hasConflict = schengenDays > 90
   const status = hasConflict ? "conflict" : "compliant"
 
-  const removeStop = (id: string) => setStops(stops.filter((s) => s.id !== id))
+  const removeStop = (stopId: string) => setStops(stops.filter((s) => s.id !== stopId))
 
-  const COUNTRY_OPTIONS = [
-    { code: "ES", name: "Spain", flag: "🇪🇸", bandType: "schengen" as const },
-    { code: "DE", name: "Germany", flag: "🇩🇪", bandType: "schengen" as const },
-    { code: "NL", name: "Netherlands", flag: "🇳🇱", bandType: "schengen" as const },
-    { code: "JP", name: "Japan", flag: "🇯🇵", bandType: "other" as const },
-    { code: "MY", name: "Malaysia", flag: "🇲🇾", bandType: "sea" as const },
-    { code: "VN", name: "Vietnam", flag: "🇻🇳", bandType: "sea" as const },
-  ]
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#0f1629" }}>
+        <p className="text-sm" style={{ color: "#64748b", fontFamily: "Plus Jakarta Sans, sans-serif" }}>
+          Loading route…
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#0f1629" }}>
@@ -200,7 +239,6 @@ export default function RoutePage() {
               </button>
             ))}
           </div>
-          {/* Free tier limit notice */}
           {stops.length >= 2 && (
             <div className="mt-3 flex items-center gap-2 text-xs" style={{ color: "#f59e0b" }}>
               <Zap size={12} />
@@ -235,14 +273,8 @@ export default function RoutePage() {
                 </h4>
                 <p className="text-xs" style={{ color: "#94a3b8", fontFamily: "Plus Jakarta Sans, sans-serif" }}>
                   Your route accumulates {schengenDays} Schengen days — {schengenDays - 90} over the 90-day limit.
-                  Suggested fix: Move Portugal return stop to after a 90-day reset period.
+                  Suggested fix: Move a Schengen stop to after a 90-day reset period.
                 </p>
-                <button
-                  className="mt-2 text-xs px-3 py-1.5 rounded-lg font-semibold"
-                  style={{ backgroundColor: "#ef4444", color: "#fff", fontFamily: "Space Grotesk, sans-serif" }}
-                >
-                  Apply suggested fix
-                </button>
               </div>
             </div>
           </motion.div>
