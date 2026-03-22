@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft, ArrowRight, MapPin, Flag, Calendar } from "lucide-react"
 
+type DateMap = Record<string, { entry: string; exit: string }>
+
 const COUNTRIES = [
   { code: "PT", name: "Portugal", flag: "🇵🇹", bandType: "schengen" },
   { code: "ES", name: "Spain", flag: "🇪🇸", bandType: "schengen" },
@@ -37,6 +39,8 @@ export default function NewRoutePage() {
   const [passport, setPassport] = useState("")
   const [selected, setSelected] = useState<string[]>([])
   const [search, setSearch] = useState("")
+  const [dates, setDates] = useState<DateMap>({})
+  const [saving, setSaving] = useState(false)
 
   const filteredCountries = COUNTRIES.filter((c) =>
     c.name.toLowerCase().includes(search.toLowerCase())
@@ -51,9 +55,51 @@ export default function NewRoutePage() {
     }
   }
 
-  const handleCreate = () => {
-    // In a real app: POST /api/routes with selected data
-    router.push("/routes/route-1")
+  const updateDate = (code: string, field: "entry" | "exit", value: string) => {
+    setDates((prev) => ({
+      ...prev,
+      [code]: { ...prev[code], [field]: value },
+    }))
+  }
+
+  const handleCreate = async () => {
+    setSaving(true)
+    try {
+      const stops = selected.map((code, i) => {
+        const c = COUNTRIES.find((x) => x.code === code)!
+        const d = dates[code] || {}
+        return {
+          countryCode: c.code,
+          countryName: c.name,
+          flag: c.flag,
+          bandType: c.bandType,
+          entryDate: d.entry || (i === 0 ? "2026-04-01" : "2026-05-01"),
+          exitDate: d.exit || (i === 0 ? "2026-04-29" : "2026-05-31"),
+        }
+      })
+
+      const passportCountry = PASSPORTS.find((p) => p.code === passport)
+      const routeName = selected
+        .map((code) => COUNTRIES.find((c) => c.code === code)?.flag)
+        .join(" → ") + (passportCountry ? ` (${passportCountry.flag})` : "")
+
+      const res = await fetch("/api/routes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: routeName, stops }),
+      })
+
+      const data = await res.json()
+      if (data.routeId) {
+        router.push(`/routes/${data.routeId}`)
+      } else {
+        router.push("/dashboard")
+      }
+    } catch {
+      router.push("/dashboard")
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -257,7 +303,8 @@ export default function NewRoutePage() {
                           type="date"
                           className="w-full px-3 py-2 rounded-lg text-sm outline-none"
                           style={{ backgroundColor: "#243060", border: "1px solid #2a3a5c", color: "#f8fafc" }}
-                          defaultValue={i === 0 ? "2026-04-01" : "2026-05-01"}
+                          value={dates[code]?.entry || (i === 0 ? "2026-04-01" : "2026-05-01")}
+                          onChange={(e) => updateDate(code, "entry", e.target.value)}
                         />
                       </div>
                       <div>
@@ -266,7 +313,8 @@ export default function NewRoutePage() {
                           type="date"
                           className="w-full px-3 py-2 rounded-lg text-sm outline-none"
                           style={{ backgroundColor: "#243060", border: "1px solid #2a3a5c", color: "#f8fafc" }}
-                          defaultValue={i === 0 ? "2026-04-29" : "2026-05-31"}
+                          value={dates[code]?.exit || (i === 0 ? "2026-04-29" : "2026-05-31")}
+                          onChange={(e) => updateDate(code, "exit", e.target.value)}
                         />
                       </div>
                     </div>
@@ -285,10 +333,16 @@ export default function NewRoutePage() {
               </button>
               <button
                 onClick={handleCreate}
+                disabled={saving}
                 className="flex-1 py-3 rounded-xl font-semibold text-sm flex items-center justify-center gap-2"
-                style={{ backgroundColor: "#f59e0b", color: "#0f1629", fontFamily: "Space Grotesk, sans-serif" }}
+                style={{
+                  backgroundColor: saving ? "#2a3a5c" : "#f59e0b",
+                  color: saving ? "#64748b" : "#0f1629",
+                  fontFamily: "Space Grotesk, sans-serif",
+                  cursor: saving ? "not-allowed" : "pointer",
+                }}
               >
-                Build my compliance timeline ✦
+                {saving ? "Saving..." : "Build my compliance timeline ✦"}
               </button>
             </div>
           </div>
