@@ -2,12 +2,27 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://bordermath.ashketing.com"),
   title: "Bordermath — Visa Route Planning for Long-Term Travelers",
   description: "Bordermath sequences your multi-country route around visa windows — so you stay legal, stay moving, and never scramble to leave a country early.",
   openGraph: {
     title: "Bordermath — Visa Route Planning for Long-Term Travelers",
     description: "Stop counting days. Start planning trips.",
     type: "website",
+    images: [
+      {
+        url: "/images/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "Bordermath — Visa Route Planning",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Bordermath — Visa Route Planning for Long-Term Travelers",
+    description: "Stop counting days. Start planning trips.",
+    images: ["/images/og-image.png"],
   },
 };
 
